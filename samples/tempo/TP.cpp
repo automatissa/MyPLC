@@ -1,6 +1,6 @@
 #include <iostream>
 #include <thread>
-#include "../../src/myplc.h"
+#include "../../lib/myplc.h"
 
 int main() {
 // Declare value here
