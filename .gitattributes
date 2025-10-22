@@ -1,0 +1,7 @@
+# .gitattributes
+# Normalize all text files to LF in repo, CRLF on Windows checkout
+* text=auto
+
+# Always use LF for Makefiles and shell scripts
+Makefile text eol=lf
+*.sh      text eol=lf

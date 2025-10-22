@@ -53,5 +53,3 @@ clean:
 # - Works on Linux, macOS, and Windows (MSYS2/MinGW or cmd.exe)
 # - For debugging: set CXXFLAGS := -std=c++17 -g -O0 -Ilib -Iuser/include -Wall -Wextra
 
-
-# Thanks to AI for this Makefile :)
