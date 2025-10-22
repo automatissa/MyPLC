@@ -1,5 +1,5 @@
 /*
 
-Put all your header files under the include directory
+Put all your header files under the user/include directory
 
 */

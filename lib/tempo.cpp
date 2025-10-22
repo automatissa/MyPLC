@@ -1,4 +1,4 @@
-#include "../myplc.h"
+#include "myplc.h"
 namespace myplc {
 
     void TON::IN(bool init_IN) {

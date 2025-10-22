@@ -1,53 +1,51 @@
-# Why myplc ?
+# myplc
 
-**myplc** is an open-source C++ library designed to replicate the behavior of PLC (Programmable Logic Controller) functions and function blocks, bringing industrial automation into the C++ ecosystem.
+**myplc** is an open-source C++ library that replicates PLC (Programmable Logic Controller) functions and function blocks, bringing industrial automation concepts into the C++ world.
 
-At Sparkia Box, we see C++ as the ultimate language for programming microcontrollers, PLCs, PC-based controls, and any device automating industrial tasks. Here’s why:
+I created this project because I believe C++ is the all-in-one language for programming microcontrollers, PLCs, PC-based controls, and other automation systems.
 
-- **Embedded Systems Standard**: C/C++ dominates embedded programming.
-- **PLC Compatibility**: Many modern PLCs and automation controls now support C++.
-- **IT-OT Bridge**: C++ classes and objects can replace traditional PLC function blocks, aligning with scalable IT practices like AI integration and rapid development.
+## Why Use myplc?
 
-We lean toward the IT side of the IT-OT divide, believing it accelerates project delivery and future-proofs automation.
+- **Embedded Standard** : C/C++ dominates embedded and real-time programming.  
+- **PLC Integration** : Many modern PLCs now support or embed C++ natively.  
+- **IT-OT Bridge** : C++ classes can replace traditional PLC function blocks, making automation more flexible and scalable.  
 
-# Current Status
+I started building `myplc` from the IT side of the IT-OT divide, aiming to accelerate automation development. Now, I’m convinced that bringing more IT principles into OT is the key to building scalable, future-proof industrial systems.
 
-This project is in early development. Core function blocks are being implemented, with more features to come.
+## Current Status
 
-# Requirements
+This project is in **early development**. Core function blocks are being implemented, with more features planned for future releases.
+
+## Requirements
 
 - C++17 or later
 - CMake 3.10+
 - A C++ compiler (e.g., GCC, MSVC)
 
-# Getting Started
+## Folder Structure
 
-1. Clone the repo: `git clone https://github.com/sparkiabox/myplc.git`
-2. Navigate to the folder: `cd myplc`
-3. (CMake setup coming soon—stay tuned!)
+- **lib/** : Source code for building the `myplc` library.  
+- **samples/** : Standalone sample programs to test functions and function blocks.  
+- **user/** : Add your custom code here.  
+- **LICENSE** : Licensed under the [GNU General Public License v3.0](https://github.com/automatissa/myplc/blob/main/LICENSE).  
+- **Makefile** : Automates building and running programs.  
 
-# How We Manage Files
+## Getting Started
 
-- **src/**: Contains the source code developed to build the `myplc` library.
-- **samples/**: Includes standalone sample programs that work independently of the environment.
-- **Makefile**: We’ll release a CMake file soon to automate installation and library setup.
-- **user_code**: We’ll release a CMake file soon to automate installation and library setup.
+Follow these steps to get started quickly:
 
-# Our Roadmap
+```bash
+# Clone the repository
+git clone https://github.com/automatissa/myplc.git
 
-We’re building `myplc` in our spare time, so there’s no set timeline—just consistent progress. Our goals are:
+# Navigate into the project folder
+cd myplc
 
-- **Replicate PLC Behavior**: Create C++ equivalents for common PLC functions and function blocks.
-- **Sample Projects**: Provide examples showing how simple C++ statements can mimic PLC behavior.
+# Build your custom code on user/ and compile it with :
+make
 
-# Contributing
+# Run your executable
+make run
 
-We welcome contributions! make changes, and submit a pull request. Focus areas: new FBs, tests, or samples.
-
-# License
-
-This project is licensed under the GNU General Public License v3.0. See [LICENSE](https://github.com/sparkiabox/myplc/blob/main/LICENSE) for details.
-
-# Contact
-
-Questions? Reach out via [GitHub Issues](https://github.com/sparkiabox/myplc/issues) or join the [myplc discussion](https://github.com/sparkiabox/myplc/discussions).
+# Clean generated binary files and previous executable
+make clean

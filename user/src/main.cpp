@@ -1,21 +1,22 @@
 #include <iostream>
 #include <thread>
-#include "../../lib/myplc.h"
+#include "myplc.h"
 
 int main() {
 // Declare value here
-int8_t STEP_MACHINE = 0;
+int STEP_MACHINE = 0;
 
 // Loop Program
 while (true) {
 
     switch (STEP_MACHINE)
     {
-    case 0: //init value
-
+    case 0: //init
+        std::cout<<"Hello myplc"<<std::endl;
+        STEP_MACHINE =1;
         break;
 
-    case 1: // Run
+    case 1: //
 
         break;
     
@@ -27,3 +28,4 @@ while (true) {
 }
 return 0;
 }
+

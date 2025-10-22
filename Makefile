@@ -1,39 +1,57 @@
-CXX = g++
-CFLAGS = -O2
+# Cross-platform Makefile (Linux + Windows MSYS/MinGW + cmd.exe)
+# Builds runtime.exe from sources in lib/ and user/src/
+# Object files are placed in ./obj, which is deleted by make clean
 
-# Source files for the library (from src/myplc_cpp/)
-LIB_SOURCES = $(wildcard src/myplc_cpp/*.cpp)
-LIB_OBJECTS = $(patsubst src/myplc_cpp/%.cpp,src/myplc_obj/%.o,$(LIB_SOURCES))
-LIBRARY = libmyplc.a
+CXX := g++
+CXXFLAGS := -std=c++17 -O2 -Ilib -Iuser/include -Wall -Wextra
 
-# Source files for the executable (from user_code/src/)
-USER_SOURCES = $(wildcard user_code/src/*.cpp)
-USER_OBJECTS = $(patsubst user_code/src/%.cpp,user_code/obj/%.o,$(USER_SOURCES))
-EXECUTABLE = runtime
+OBJDIR := obj
+SRCDIR_LIB := lib
+SRCDIR_USER := user/src
 
-# Default target: build both the library and the executable
-all: dirs $(LIBRARY) $(EXECUTABLE)
+LIB_SRCS := $(wildcard $(SRCDIR_LIB)/*.cpp)
+LIB_OBJS := $(patsubst $(SRCDIR_LIB)/%.cpp,$(OBJDIR)/lib_%.o,$(LIB_SRCS))
+USER_SRCS := $(wildcard $(SRCDIR_USER)/*.cpp)
+USER_OBJS := $(patsubst $(SRCDIR_USER)/%.cpp,$(OBJDIR)/user_%.o,$(USER_SRCS))
 
-# Create directories explicitly
-dirs:
-	@mkdir -p src/myplc_obj user_code/obj
+TARGET := runtime.exe
 
-# Link the user objects with the library to create the executable
-$(EXECUTABLE): $(USER_OBJECTS) $(LIBRARY)
-	$(CXX) $(USER_OBJECTS) -L. -lmyplc -o $@
+.PHONY: all clean run
 
-# Build the library from its object files
-$(LIBRARY): $(LIB_OBJECTS)
-	ar rcs $@ $^
+all: $(TARGET)
 
-# Compile library source files into object files in src/myplc_obj/
-src/myplc_obj/%.o: src/myplc_cpp/%.cpp
-	$(CXX) $(CFLAGS) -c $< -o $@
+$(TARGET): $(OBJDIR) $(LIB_OBJS) $(USER_OBJS)
+	$(CXX) $(CXXFLAGS) -o $@ $(LIB_OBJS) $(USER_OBJS)
 
-# Compile user source files into object files in user_code/obj/
-user_code/obj/%.o: user_code/src/%.cpp
-	$(CXX) $(CFLAGS) -I../src -c $< -o $@
+# Cross-platform mkdir
+ifeq ($(OS),Windows_NT)
+MKDIR = if not exist $(OBJDIR) mkdir $(OBJDIR)
+RM = rmdir /s /q $(OBJDIR) 2>nul & del /q $(TARGET) 2>nul || exit 0
+else
+MKDIR = mkdir -p $(OBJDIR)
+RM = rm -rf $(OBJDIR) $(TARGET)
+endif
 
-# Clean up
+$(OBJDIR):
+	@$(MKDIR)
+
+# Compile library sources
+$(OBJDIR)/lib_%.o: $(SRCDIR_LIB)/%.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+# Compile user sources
+$(OBJDIR)/user_%.o: $(SRCDIR_USER)/%.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+run: $(TARGET)
+	@./$(TARGET)
+
 clean:
-	rm -rf $(LIBRARY) $(EXECUTABLE) src/myplc_obj user_code/obj
+	@$(RM)
+
+# Notes:
+# - Works on Linux, macOS, and Windows (MSYS2/MinGW or cmd.exe)
+# - For debugging: set CXXFLAGS := -std=c++17 -g -O0 -Ilib -Iuser/include -Wall -Wextra
+
+
+# Thanks to AI for this Makefile :)
