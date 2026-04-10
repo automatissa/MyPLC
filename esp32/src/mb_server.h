@@ -14,6 +14,7 @@
 #include <WiFi.h>
 #include "sim/registry.h"
 
+
 namespace myplc::esp32 {
 
 // Internal state
