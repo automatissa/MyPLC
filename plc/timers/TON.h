@@ -1,6 +1,5 @@
 #pragma once
 #include "plc/types.h"
-#include <chrono>
 
 namespace myplc {
 
@@ -30,16 +29,16 @@ public:
 
     // Output getters
     BOOL Q()  const { return _Q; }
-    INT  ET() const { return static_cast<INT>(_ET.count()); }   // elapsed ms
+    TIME ET() const { return _ET; }   // elapsed ms
 
 protected:
     BOOL _IN       = false;
     BOOL _Q        = false;
-    TIME _PT       = 0ms;
-    TIME _ET       = 0ms;
+    TIME _PT       = 0;
+    TIME _ET       = 0;
     BOOL _prev_IN  = false;
     BOOL _running  = false;
-    std::chrono::time_point<std::chrono::steady_clock> _start{};
+    TIME _start    = 0;   // plc_millis() snapshot at start
 
     // Template Method: subclasses override only the execution logic.
     virtual void _execute();

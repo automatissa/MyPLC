@@ -19,14 +19,14 @@ void TON::IN(BOOL in) {
 void TON::_execute() {
     // Rising edge: start timing
     if (_IN && !_prev_IN) {
-        _start   = std::chrono::steady_clock::now();
-        _ET      = 0ms;
+        _start   = plc_millis();
+        _ET      = 0;
         _Q       = false;
         _running = true;
     }
     // Falling edge: reset immediately
     if (!_IN && _prev_IN) {
-        _ET      = 0ms;
+        _ET      = 0;
         _Q       = false;
         _running = false;
     }
@@ -34,8 +34,7 @@ void TON::_execute() {
 
     // Update elapsed time while running
     if (_running) {
-        auto now = std::chrono::steady_clock::now();
-        _ET = std::chrono::duration_cast<TIME>(now - _start);
+        _ET = plc_millis() - _start;
         if (_ET >= _PT) {
             _ET      = _PT;   // clamp to preset
             _Q       = true;

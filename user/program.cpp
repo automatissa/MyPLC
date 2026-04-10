@@ -52,17 +52,21 @@ myplc::TON delay;
 
 // ── Initialisation ───────────────────────────────────────────────────────────
 // Called once before the scan loop starts.
+// Not compiled in HMI mode — only PLC_VAR declarations above are needed
+// to populate the Modbus register map on the RPi dashboard.
+#ifndef HMI_MODE
 void INIT() {
-    delay.PT(T(5s));     // preset: 5 seconds
+    delay.PT(T(5s));     // preset: 5 seconds  (use T_s(5) on ESP32)
 }
 
 // ── Main Scan Loop ───────────────────────────────────────────────────────────
-// Called every 10 ms by the runtime harness.
+// Called every SCAN_CYCLE_MS by the runtime harness.
 void LOOP() {
 
     // Timer On Delay: motor starts 5 s after start_button is pressed.
     delay(start_button, T(5s));
 
-    motor_run    = delay.Q();    // output follows timer output
-    cycle_time_ms = delay.ET();  // expose elapsed time to dashboard
+    motor_run     = delay.Q();    // output follows timer output
+    cycle_time_ms = delay.ET();   // expose elapsed time to dashboard
 }
+#endif  // HMI_MODE

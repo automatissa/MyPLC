@@ -3,8 +3,10 @@
 #  Works from: PowerShell / cmd.exe (Windows) · bash (Linux, Raspberry Pi)
 #
 #  Targets:
-#    make                  → build runtime.exe
+#    make                  → build runtime.exe  (full PLC + web HMI + Modbus server)
 #    make run              → build and run  (open http://localhost:8080)
+#    make hmi              → build runtime_hmi.exe  (web HMI + Modbus client for RPi)
+#    make hmi_run          → build and run the HMI binary
 #    make sample S=01_TON  → build and run a standalone sample
 #    make samples          → list available samples
 #    make clean            → remove build artefacts
@@ -14,6 +16,7 @@ CXX      := g++
 CXXFLAGS := -std=c++17 -O2 -I. -Wall -Wextra
 OBJDIR   := obj
 TARGET   := runtime.exe
+HMI_TGT  := runtime_hmi.exe
 
 # ── Source files ──────────────────────────────────────────────────────────────
 PLC_SRCS := \
@@ -28,9 +31,19 @@ PLC_SRCS := \
     plc/bistables/SR.cpp    \
     plc/bistables/RS.cpp
 
-SIM_SRCS := sim/registry.cpp sim/server.cpp
+# Full simulator: HTTP + Modbus server + user program
+SIM_SRCS := sim/registry.cpp sim/server.cpp sim/modbus_server.cpp
 RT_SRCS  := runtime/main.cpp user/program.cpp
 ALL_SRCS := $(PLC_SRCS) $(SIM_SRCS) $(RT_SRCS)
+
+# HMI mode: HTTP + Modbus client (no PLC loop, no Modbus server)
+HMI_SRCS := \
+    $(PLC_SRCS) \
+    sim/registry.cpp \
+    sim/server.cpp \
+    sim/modbus_client.cpp \
+    runtime/hmi_main.cpp \
+    user/program.cpp
 
 # Flatten path → single object name:  plc/timers/TON.cpp → obj/plc_timers_TON.o
 obj_of   = $(OBJDIR)/$(subst /,_,$(patsubst %.cpp,%.o,$(1)))
@@ -38,27 +51,28 @@ ALL_OBJS := $(foreach s,$(ALL_SRCS),$(call obj_of,$(s)))
 
 # ── Platform detection ────────────────────────────────────────────────────────
 ifeq ($(OS),Windows_NT)
-    # Force cmd.exe so recipes work from PowerShell, cmd, and MSYS2 alike.
     SHELL   := cmd
     MKDIR   := if not exist $(OBJDIR) md $(OBJDIR)
     RM      := (if exist $(OBJDIR) rmdir /s /q $(OBJDIR)) & \
                (if exist $(TARGET) del /q $(TARGET)) & \
+               (if exist $(HMI_TGT) del /q $(HMI_TGT)) & \
                (del /q sample_*.exe 2>nul & exit 0)
     RUN     := $(TARGET)
+    HMI_RUN := $(HMI_TGT)
     NL      := @echo.
     # Static-link runtimes: no MSYS2 DLL dependency, avoids Defender blocking
     LDFLAGS := -static-libgcc -static-libstdc++ -lws2_32
 else
-    # Linux / Raspberry Pi
     MKDIR   := mkdir -p $(OBJDIR)
-    RM      := rm -rf $(OBJDIR) $(TARGET) sample_*.exe
+    RM      := rm -rf $(OBJDIR) $(TARGET) $(HMI_TGT) sample_*.exe
     RUN     := ./$(TARGET)
+    HMI_RUN := ./$(HMI_TGT)
     NL      := @echo
     LDFLAGS :=
 endif
 
 # ── Main targets ──────────────────────────────────────────────────────────────
-.PHONY: all run sample samples clean
+.PHONY: all run hmi hmi_run sample samples clean
 
 all: $(TARGET)
 
@@ -70,6 +84,18 @@ $(TARGET): $(OBJDIR) $(ALL_OBJS)
 
 run: $(TARGET)
 	$(RUN)
+
+# ── HMI target (Raspberry Pi — Modbus client + web dashboard) ─────────────────
+# Compiled in one shot with -DHMI_MODE so INIT()/LOOP() in user/program.cpp
+# are excluded while PLC_VAR declarations (and thus Modbus addresses) still run.
+hmi: $(OBJDIR)
+	$(CXX) $(CXXFLAGS) -DHMI_MODE -o $(HMI_TGT) $(HMI_SRCS) $(LDFLAGS)
+	$(NL)
+	@echo   HMI build OK — run 'make hmi_run' then open http://localhost:8080
+	$(NL)
+
+hmi_run: hmi
+	$(HMI_RUN)
 
 # ── Object directory ──────────────────────────────────────────────────────────
 $(OBJDIR):
@@ -115,7 +141,10 @@ clean:
 # ==============================================================================
 #  Notes
 #  ─────
+#  • make / make run       → PC simulation (PLC + web HMI + Modbus server on port 502)
+#  • make hmi / make hmi_run → RPi HMI mode (web dashboard + Modbus client → ESP32)
+#  • make sample S=NN_NAME → standalone sample (no sim/ or runtime/ deps)
 #  • Debug build: change -O2 to -g -O0 in CXXFLAGS
-#  • Windows links -lws2_32 (WinSock2) for the HTTP simulator server
-#  • Samples are standalone — they do not depend on sim/ or runtime/
+#  • Windows links -lws2_32 (WinSock2) for all socket-based components
+#  • Port 502 requires root on Linux — use sudo ./runtime.exe or change MODBUS_PORT
 # ==============================================================================
