@@ -18,6 +18,8 @@ obj/
 *.swp
 *.swo
 *~
+CLAUDE.md 
+.claudeignore
 
 # ── OS artefacts ──────────────────────────────────────────────────────────────
 .DS_Store
@@ -31,3 +33,4 @@ desktop.ini
 *.ilk
 *.exp
 *.lib
+.pio

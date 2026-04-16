@@ -85,14 +85,28 @@ static const char* INDEX_HTML = R"HTML(<!DOCTYPE html>
       letter-spacing: 0.06em;
       border-bottom: 1px solid #30363d;
     }
-    td { padding: 8px 16px; border-bottom: 1px solid #21262d; }
+    td { padding: 8px 16px; border-bottom: 1px solid #21262d; vertical-align: middle; }
     tr:last-child td { border-bottom: none; }
     tr:hover td { background: #1c2128; }
 
-    .n  { color: #79c0ff; font-weight: 600; }
-    .t  { color: #d2a8ff; font-size: 0.78rem; }
-    .v  { color: #3fb950; }
-    .vf { color: #6e7681; }
+    .n   { color: #79c0ff; font-weight: 600; }
+    .t   { color: #d2a8ff; font-size: 0.78rem; }
+    .mb  { color: #e3b341; font-size: 0.82rem; font-variant-numeric: tabular-nums; }
+    .v   { color: #3fb950; }
+    .vf  { color: #6e7681; }
+    .ro  { color: #6e7681; }
+
+    .dir {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+    .dir-INPUT  { background:#1b4332; color:#3fb950; }
+    .dir-OUTPUT { background:#0d2149; color:#58a6ff; }
+    .dir-MEM    { background:#2d1f4e; color:#d2a8ff; }
 
     .form { display:flex; gap:6px; align-items:center; }
     input[type=text] {
@@ -109,12 +123,27 @@ static const char* INDEX_HTML = R"HTML(<!DOCTYPE html>
 
     @keyframes hi { from { background:#1b4332; } to { background:transparent; } }
     .flash td { animation: hi 0.4s ease; }
+
+    .mode-btn {
+      padding: 3px 14px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      border: none;
+      cursor: pointer;
+      font-family: monospace;
+      transition: background 0.2s;
+    }
+    .mode-sim  { background:#1b4332; color:#3fb950; }
+    .mode-real { background:#0d2149; color:#58a6ff; }
   </style>
 </head>
 <body>
   <header>
     <h1>&#9654; MyPLC Simulator</h1>
     <span id="badge" class="badge stopped">STOPPED</span>
+    <button id="mode-btn" class="mode-btn mode-sim" onclick="toggleMode()">SIMU</button>
     <div class="stats">
       Refresh&nbsp;<span id="hz">-</span>&nbsp;|&nbsp;Cycle&nbsp;<span id="cyc">0</span>
     </div>
@@ -122,13 +151,20 @@ static const char* INDEX_HTML = R"HTML(<!DOCTYPE html>
 
   <table>
     <thead>
-      <tr><th>Variable</th><th>Type</th><th>Value</th><th>Write</th></tr>
+      <tr>
+        <th>Variable</th>
+        <th>Dir</th>
+        <th>Type</th>
+        <th>Modbus Address</th>
+        <th>Value</th>
+        <th>Write</th>
+      </tr>
     </thead>
     <tbody id="tb"></tbody>
   </table>
 
   <script>
-    let ready = false, cyc = 0, t0 = Date.now();
+    let ready = false, cyc = 0, t0 = Date.now(), simMode = true;
 
     function fmt(type, val) {
       if (type === 'BOOL')
@@ -138,10 +174,36 @@ static const char* INDEX_HTML = R"HTML(<!DOCTYPE html>
       return '<span class="v">' + val + '</span>';
     }
 
+    function dirBadge(dir) {
+      return '<span class="dir dir-' + dir + '">' + dir + '</span>';
+    }
+
+    function mbAddr(addr) {
+      // Protocol address is 0-based; display as 4xxxx (1-based Modbus notation)
+      return '4' + String(addr + 1).padStart(4, '0');
+    }
+
+    function updateModeBtn(sim) {
+      const btn = document.getElementById('mode-btn');
+      if (sim) { btn.textContent = 'SIMU'; btn.className = 'mode-btn mode-sim'; }
+      else      { btn.textContent = 'RÉEL'; btn.className = 'mode-btn mode-real'; }
+    }
+
+    async function toggleMode() {
+      const r = await fetch('/api/mode', { method: 'POST' }).catch(() => null);
+      if (!r) return;
+      const d = await r.json();
+      simMode = d.sim;
+      updateModeBtn(simMode);
+      ready = false;  // rebuild table (write column changes)
+    }
+
     async function poll() {
       try {
         const r   = await fetch('/api/vars');
-        const arr = await r.json();
+        const d   = await r.json();
+        const arr = d.vars;
+        if (d.sim !== simMode) { simMode = d.sim; updateModeBtn(simMode); ready = false; }
         const tb  = document.getElementById('tb');
 
         if (!ready) {
@@ -149,14 +211,20 @@ static const char* INDEX_HTML = R"HTML(<!DOCTYPE html>
           arr.forEach(v => {
             const tr = document.createElement('tr');
             tr.id = 'r_' + v.name;
+            const canWrite = v.dir === 'MEM' || (v.dir === 'INPUT' && simMode);
+            const writeCell = canWrite
+              ? '<div class="form">' +
+                  '<input type="text" id="i_' + v.name + '" placeholder="' + v.value + '">' +
+                  '<button onclick="wr(\'' + v.name + '\',\'' + v.type + '\')">Set</button>' +
+                '</div>'
+              : '<span class="ro">—</span>';
             tr.innerHTML =
-              '<td class="n">' + v.name + '</td>' +
-              '<td class="t">' + v.type + '</td>' +
+              '<td class="n">'  + v.name              + '</td>' +
+              '<td>'            + dirBadge(v.dir)      + '</td>' +
+              '<td class="t">'  + v.type               + '</td>' +
+              '<td class="mb">' + mbAddr(v.mb_addr)    + '</td>' +
               '<td id="v_' + v.name + '">' + fmt(v.type, v.value) + '</td>' +
-              '<td><div class="form">' +
-                '<input type="text" id="i_' + v.name + '" placeholder="' + v.value + '">' +
-                '<button onclick="wr(\'' + v.name + '\',\'' + v.type + '\')">Set</button>' +
-              '</div></td>';
+              '<td>' + writeCell + '</td>';
             tb.appendChild(tr);
           });
           ready = true;
@@ -169,13 +237,13 @@ static const char* INDEX_HTML = R"HTML(<!DOCTYPE html>
 
         cyc++;
         const hz = (cyc / ((Date.now() - t0) / 1000)).toFixed(1);
-        document.getElementById('cyc').textContent  = cyc;
-        document.getElementById('hz').textContent   = hz + ' Hz';
+        document.getElementById('cyc').textContent   = cyc;
+        document.getElementById('hz').textContent    = hz + ' Hz';
         document.getElementById('badge').textContent = 'RUNNING';
-        document.getElementById('badge').className  = 'badge running';
+        document.getElementById('badge').className   = 'badge running';
       } catch (_) {
         document.getElementById('badge').textContent = 'DISCONNECTED';
-        document.getElementById('badge').className  = 'badge stopped';
+        document.getElementById('badge').className   = 'badge stopped';
         ready = false;
       }
     }
@@ -189,7 +257,7 @@ static const char* INDEX_HTML = R"HTML(<!DOCTYPE html>
       if (row) { row.classList.remove('flash'); void row.offsetWidth; row.classList.add('flash'); }
     }
 
-    setInterval(poll, 500);
+    setInterval(poll, 100);
     poll();
   </script>
 </body>
@@ -215,7 +283,7 @@ static void send_response(socket_t s, int code,
 }
 
 static void handle_client(socket_t client) {
-    char buf[8192] = {};
+    char buf[16384] = {};
     int  n = ::recv(client, buf, (int)sizeof(buf) - 1, 0);
     if (n <= 0) { CLOSE_SOCK(client); return; }
 
@@ -258,6 +326,11 @@ static void handle_client(socket_t client) {
         Registry::get().write(name, body);
         send_response(client, 204, "text/plain", "");
     }
+    else if (method == "POST" && path == "/api/mode") {
+        bool sim = Registry::get().toggle_sim_mode();
+        send_response(client, 200, "application/json",
+                      sim ? "{\"sim\":true}" : "{\"sim\":false}");
+    }
     else if (method == "OPTIONS") {
         send_response(client, 204, "text/plain", "");
     }
@@ -290,7 +363,6 @@ static void server_loop(int port) {
         return;
     }
     ::listen(srv, 16);
-    std::cout << "[sim] Dashboard  →  http://localhost:" << port << "\n";
 
     while (true) {
         socket_t client = ::accept(srv, nullptr, nullptr);

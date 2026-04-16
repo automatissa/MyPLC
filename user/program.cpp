@@ -1,36 +1,51 @@
 // ============================================================================
 //  MyPLC — User Program
-//  Edit this file to write your PLC program.
+//  Éditer uniquement ce fichier pour écrire la logique PLC.
 //
-//  Structure mirrors IEC 61131-3 Structured Text (ST):
+//  Structure identique à IEC 61131-3 Structured Text (ST) :
 //
 //    ┌──────────────────────────────────────────────┐
 //    │  PROGRAM Main                                │
-//    │    VAR                                       │
+//    │    VAR_INPUT                                 │
 //    │      start_button : BOOL := FALSE;           │
+//    │    END_VAR                                   │
+//    │    VAR_OUTPUT                                │
 //    │      motor_run    : BOOL := FALSE;           │
 //    │      cycle_time   : INT  := 0;               │
+//    │    END_VAR                                   │
+//    │    VAR                                       │
 //    │      delay        : TON;                     │
 //    │    END_VAR                                   │
-//    │                                              │
 //    │    delay(IN := start_button, PT := T#5s);    │
 //    │    motor_run  := delay.Q;                    │
-//    │    cycle_time := delay.ET;                   │
 //    │  END_PROGRAM                                 │
 //    └──────────────────────────────────────────────┘
 //
-//  In C++ with MyPLC:
+//  ─── Services démarrés automatiquement ──────────────────────────────────
 //
-//    PLC_VAR(BOOL, start_button, false)  ← mirrors  start_button : BOOL
-//    myplc::TON delay;                   ← mirrors  delay : TON
+//  Web dashboard  →  http://0.0.0.0:8080
+//  Modbus TCP     →  0.0.0.0:502   (FC03 read / FC06 FC16 write)
 //
-//    void LOOP() {
-//        delay(start_button, T(5s));     ← same call style as ST
-//        motor_run  = delay.Q();
-//        cycle_time = delay.ET();
-//    }
+//  Toutes les VAR_INPUT/VAR_OUTPUT sont exposées en holding registers.
+//  La table d'adresses s'affiche au démarrage et dans le dashboard.
+//  Sur Linux/RPi : sudo make run
 //
-//  Open http://localhost:8080 after running `make run` to see the dashboard.
+//  ─── Architecture avec ESP32 Remote I/O ─────────────────────────────────
+//
+//  La RPi est le Modbus TCP Server.  L'ESP32 est le Modbus TCP Client.
+//
+//    RPi (ce fichier)                  ESP32 (firmware/src/io_map.h)
+//    ─────────────────                 ──────────────────────────────
+//    VAR_INPUT  start_button  ←─FC06── GPIO34 (bouton)
+//    VAR_OUTPUT motor_run     ──FC03─→ GPIO2  (relais)
+//
+//  Workflow :
+//    1. Déclarer les variables ici (VAR_INPUT / VAR_OUTPUT)
+//    2. Lancer la RPi → noter les adresses dans le dashboard
+//    3. Renseigner firmware/src/io_map.h (GPIO ↔ adresse RPi)
+//    4. Flasher l'ESP32 avec PlatformIO
+//
+//  Open http://localhost:8080 after `make run` to see the dashboard.
 // ============================================================================
 
 #include "plc/myplc.h"
@@ -39,30 +54,17 @@
 using namespace myplc;
 
 // ── Variable Declarations ────────────────────────────────────────────────────
-// PLC_VAR(TYPE, name, initial_value)
-//   → declares the global variable
-//   → registers it with the web dashboard (read + write)
+//   VAR_INPUT (TYPE, name, init)  — physical input  (ESP32 → RPi)   writable
+//   VAR_OUTPUT(TYPE, name, init)  — physical output (RPi  → ESP32)  read-only
+//   VAR_MEM   (TYPE, name, init)  — internal memory                  writable
+//
+// All variables are auto-assigned a Modbus holding register address and
+// shown with their address in the web dashboard.
 
-PLC_VAR(BOOL, start_button, false)   // Simulated input  — toggle in dashboard
-PLC_VAR(BOOL, motor_run,    false)   // Simulated output — visible in dashboard
-PLC_VAR(INT,  cycle_time_ms, 0)      // Elapsed timer value (ms)
+VAR_INPUT(BOOL, esp32_connected, false)  // 40001  addr 0 — 1 si ESP32 joignable via Modbus
 
-// Function block instances are declared normally (they're not simple values).
-myplc::TON delay;
+void INIT() {}
 
-// ── Initialisation ───────────────────────────────────────────────────────────
-// Called once before the scan loop starts.
-void INIT() {
-    delay.PT(T(5s));     // preset: 5 seconds
-}
-
-// ── Main Scan Loop ───────────────────────────────────────────────────────────
-// Called every 10 ms by the runtime harness.
 void LOOP() {
-
-    // Timer On Delay: motor starts 5 s after start_button is pressed.
-    delay(start_button, T(5s));
-
-    motor_run    = delay.Q();    // output follows timer output
-    cycle_time_ms = delay.ET();  // expose elapsed time to dashboard
+    //esp32_connected = false;  // watchdog : effacé chaque scan, l'ESP32 doit réécrire
 }
