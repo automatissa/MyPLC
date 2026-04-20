@@ -4,7 +4,7 @@
 // ============================================================================
 //  Modbus TCP Server — démarre automatiquement au lancement du runtime.
 //
-//  Toutes les PLC_VAR sont mappées en holding registers automatiquement.
+//  Toutes les VAR_INPUT / VAR_OUTPUT / VAR_MEM sont mappées en holding registers.
 //  La table d'adresses (4xxxx) est affichée à chaque démarrage.
 //  Aucun code utilisateur requis — le runtime s'en charge.
 //

@@ -13,7 +13,7 @@ with the same structure and syntax they already know.
 
 - **Familiar API** — ST call style works as-is: `myTimer(sensor, T(5s));`
 - **Standard types** — `BOOL`, `INT`, `DINT`, `REAL`, `TIME` map directly to C++ primitives
-- **VAR_INPUT / VAR_OUTPUT / VAR** — mirrors IEC 61131-3 variable sections exactly
+- **VAR_INPUT / VAR_OUTPUT / VAR_MEM** — mirrors IEC 61131-3 variable sections exactly
 - **Web dashboard** — live variable table with Modbus addresses, direction badges, write field
 - **Modbus TCP server** — all variables exposed as holding registers automatically, no code needed
 - **ESP32 remote I/O** — dumb I/O board connects to the RPi as a Modbus client; zero extra code in your PLC program
@@ -79,8 +79,8 @@ Au lancement, deux services démarrent en arrière-plan — aucun code requis :
 
 | Service | Adresse |
 |---------|---------|
-| Web dashboard | http://0.0.0.0:8080 |
-| Modbus TCP server | 0.0.0.0:502 |
+| Web dashboard | http://localhost:8080 |
+| Modbus TCP server | 0.0.0.0:502 (toutes interfaces) |
 
 La table des registres s'affiche au démarrage et dans le dashboard :
 
@@ -100,23 +100,25 @@ La table des registres s'affiche au démarrage et dans le dashboard :
 **You only edit one file: `user/program.cpp`**
 
 ```cpp
-// ── Variable declarations ─────────────────────────────────────────────────────
-VAR_INPUT (BOOL, start_button,  false)  // 40001 — ESP32 writes sensor value here
-VAR_OUTPUT(BOOL, motor_run,     false)  // 40002 — ESP32 reads actuator command here
-VAR_OUTPUT(INT,  cycle_time_ms, 0)      // 40003 — computed by PLC, read-only
+// ── Heartbeat ESP32 (VAR_INPUT — ESP32 writes 1 every cycle) ─────────────────
+VAR_INPUT(BOOL, esp32_hb,   false)  // 40001  addr 0 — connection watchdog
 
-myplc::TON delay;  // Function block — declared as plain global
+// ── Operator memory — writable from dashboard / SCADA ────────────────────────
+VAR_MEM  (BOOL, start_btn,  false)  // 40002  addr 1 — start command (HMI)
 
-// ── Initialisation ───────────────────────────────────────────────────────────
-void INIT() {
-    delay.PT(T(5s));
-}
+// ── Field inputs (ESP32 → RPi via FC06) ──────────────────────────────────────
+VAR_INPUT(BOOL, sensor_ir,  false)  // 40003  addr 2 — IR sensor
 
-// ── Main scan loop (called every 10 ms) ─────────────────────────────────────
+// ── Field outputs (RPi → ESP32 via FC03) ─────────────────────────────────────
+VAR_OUTPUT(BOOL, motor_run, false)  // 40004  addr 3 — conveyor motor
+VAR_OUTPUT(BOOL, led_start, false)  // 40005  addr 4 — start indicator LED
+
+void INIT() {}
+
 void LOOP() {
-    delay(start_button, T(5s));
-    motor_run     = delay.Q();
-    cycle_time_ms = delay.ET();
+    motor_run = esp32_hb && start_btn && !sensor_ir;
+    led_start = start_btn;
+    esp32_hb  = false;  // watchdog — cleared each scan, ESP32 must re-write
 }
 ```
 
@@ -146,21 +148,22 @@ void LOOP() {
 After `make run`, open **http://localhost:8080**.
 
 ```
-┌───────────────┬─────────┬──────┬────────────────┬───────┬───────────┐
-│ Variable      │ Dir     │ Type │ Modbus Address │ Value │ Write     │
-├───────────────┼─────────┼──────┼────────────────┼───────┼───────────┤
-│ start_button  │ INPUT   │ BOOL │ 40001          │ FALSE │ [  ] Set  │
-│ motor_run     │ OUTPUT  │ BOOL │ 40002          │ FALSE │ —         │
-│ cycle_time_ms │ OUTPUT  │ INT  │ 40003          │ 2340  │ —         │
-│ speed_setpt   │ MEM     │ INT  │ 40004          │ 1500  │ [  ] Set  │
-└───────────────┴─────────┴──────┴────────────────┴───────┴───────────┘
+┌────────────┬─────────┬──────┬────────────────┬───────┬───────────┐
+│ Variable   │ Dir     │ Type │ Modbus Address │ Value │ Write     │
+├────────────┼─────────┼──────┼────────────────┼───────┼───────────┤
+│ esp32_hb   │ INPUT   │ BOOL │ 40001          │ TRUE  │ [  ] Set  │
+│ start_btn  │ MEM     │ BOOL │ 40002          │ FALSE │ [  ] Set  │
+│ sensor_ir  │ INPUT   │ BOOL │ 40003          │ FALSE │ [  ] Set  │
+│ motor_run  │ OUTPUT  │ BOOL │ 40004          │ FALSE │ —         │
+│ led_start  │ OUTPUT  │ BOOL │ 40005          │ FALSE │ —         │
+└────────────┴─────────┴──────┴────────────────┴───────┴───────────┘
 ```
 
 - Green `INPUT` badge — physical sensor input, writable from dashboard and Modbus
 - Blue `OUTPUT` badge — physical actuator output, read-only (computed by the PLC)
 - Purple `MEM` badge — internal memory, writable from dashboard and Modbus
 - **Modbus Address** column — always visible, configure your SCADA from here
-- Auto-refresh every 500 ms
+- Auto-refresh every 100 ms
 
 ---
 
@@ -219,11 +222,17 @@ ESP32 (Modbus TCP Client — dumb I/O board)
 
 ```cpp
 // user/program.cpp
-VAR_INPUT (BOOL, start_button, false)  // 40001 — physical input:  ESP32 GPIO34 → RPi
-VAR_OUTPUT(BOOL, motor_run,    false)  // 40002 — physical output: RPi → ESP32 GPIO2
-VAR_OUTPUT(INT,  speed_rpm,    0)      // 40003 — physical output: RPi → ESP32 GPIO25 PWM
-VAR_MEM   (INT,  speed_setpoint, 1500) // 40004 — internal memory: writable setpoint
+VAR_INPUT (BOOL, esp32_hb,   false)  // 40001 — heartbeat: ESP32 writes 1 every cycle
+VAR_MEM   (BOOL, start_btn,  false)  // 40002 — operator command (dashboard / SCADA)
+VAR_INPUT (BOOL, sensor_ir,  false)  // 40003 — field input: IR sensor via ESP32
+VAR_OUTPUT(BOOL, motor_run,  false)  // 40004 — field output: conveyor → ESP32 GPIO
+VAR_OUTPUT(BOOL, led_start,  false)  // 40005 — field output: indicator LED → ESP32 GPIO
 ```
+
+The **heartbeat pattern** (`esp32_hb`) is the recommended way to detect ESP32 connectivity:
+- ESP32 writes `1` every cycle (10 ms) via FC06
+- PLC clears it at end of LOOP — if ESP32 drops, it stays `false` within one scan
+- Gate any safety-critical output behind `esp32_hb`: `motor_run = esp32_hb && ...`
 
 Run `make run` and open the dashboard to confirm the addresses.
 
@@ -234,14 +243,17 @@ Edit `firmware/src/io_map.h` — match GPIO pins to RPi register addresses:
 ```cpp
 #define WIFI_SSID  "YourNetwork"
 #define WIFI_PASS  "YourPassword"
-#define RPI_IP     "192.168.1.10"  // RPi IP address
+#define RPI_IP     "192.168.137.1"  // Windows hotspot: 192.168.137.1 / RPi: its IP
 #define RPI_PORT    502
+#define HEARTBEAT_ADDR  0           // must match esp32_hb addr in program.cpp
 
-// {GPIO pin, RPi register address}  (address = 4xxxx displayed − 40001)
-constexpr IoPin DIGITAL_INPUTS[]  = { {34, 0} };  // GPIO34 → start_button (addr 0)
-constexpr IoPin DIGITAL_OUTPUTS[] = { {2,  1} };  // GPIO2  ← motor_run    (addr 1)
-constexpr IoPin ANALOG_OUTPUTS[]  = { {25, 2} };  // GPIO25 ← speed_rpm    (addr 2)
+// {GPIO pin, RPi register address}  (address = 4xxxx − 40001)
+constexpr IoPin DIGITAL_INPUTS[]  = { {34, 2} };  // GPIO34 → sensor_ir  (addr 2)
+constexpr IoPin DIGITAL_OUTPUTS[] = { {4,  3},    // GPIO4  ← motor_run  (addr 3)
+                                      {13, 4} };  // GPIO13 ← led_start  (addr 4)
 ```
+
+> The built-in LED (GPIO2) lights up automatically when Modbus is working — no config needed.
 
 ### Step 3 — Flash
 
@@ -256,7 +268,7 @@ The ESP32 connects to the RPi automatically and reconnects on WiFi drops or RPi 
 ## Make Commands
 
 ```bash
-make              # compile runtime.exe
+make              # compile runtime.exe (auto-kills previous instance on Windows)
 make run          # compile + start runtime (non-blocking — terminal stays free)
 make flash        # flash the ESP32 firmware via PlatformIO
 make clean        # remove obj/ and runtime.exe
@@ -267,9 +279,11 @@ make samples                # list all available samples
 
 Typical session:
 ```bash
-make run          # start the RPi runtime
+make run          # start the RPi runtime (kills previous instance automatically)
 make flash        # flash the ESP32 — same terminal, no need to open another
 ```
+
+> **Windows**: `make run` must be run from the **MSYS2 UCRT64** terminal, not PowerShell. `make flash` works from anywhere since it only calls `pio`.
 
 ---
 

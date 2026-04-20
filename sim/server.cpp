@@ -1,7 +1,7 @@
 #include "sim/server.h"
 #include "sim/registry.h"
 
-#include <iostream>
+#include <cstdio>
 #include <sstream>
 #include <string>
 #include <thread>
@@ -346,7 +346,8 @@ static void server_loop(int port) {
 
     socket_t srv = ::socket(AF_INET, SOCK_STREAM, 0);
     if (srv == INVALID_SOCK) {
-        std::cerr << "[sim] socket() failed\n";
+        std::printf("[sim] socket() failed\n");
+        std::fflush(stdout);
         return;
     }
     int opt = 1;
@@ -358,7 +359,8 @@ static void server_loop(int port) {
     addr.sin_port        = htons((uint16_t)port);
 
     if (::bind(srv, (sockaddr*)&addr, sizeof(addr)) < 0) {
-        std::cerr << "[sim] bind() failed on port " << port << "\n";
+        std::printf("[sim] ERREUR bind(%d) — port occupé ou accès refusé\n", port);
+        std::fflush(stdout);
         CLOSE_SOCK(srv);
         return;
     }

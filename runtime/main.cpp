@@ -2,12 +2,12 @@
 //  MyPLC Runtime Harness  —  do not modify this file.
 //
 //  Services started automatically at boot (no user code required):
-//    • Web dashboard  → http://0.0.0.0:8080
+//    • Web dashboard  → http://localhost:8080
 //    • Modbus TCP     → 0.0.0.0:502   (FC03 / FC06 / FC16)
 //
-//  All PLC_VAR variables are mapped to Modbus holding registers
-//  automatically, in declaration order.  The address table is printed
-//  at startup so you always know where each variable lives.
+//  All VAR_INPUT / VAR_OUTPUT / VAR_MEM variables are mapped to Modbus
+//  holding registers automatically, in declaration order.
+//  The address table is printed at startup.
 //
 //  On Linux/RPi, port 502 requires root:
 //    sudo make run

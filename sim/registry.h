@@ -10,8 +10,8 @@
 // ============================================================================
 //  Variable Registry — powers the web dashboard + Modbus server.
 //
-//  Each PLC_VAR declaration automatically:
-//    1. Registers the variable with the web dashboard (read/write)
+//  Each VAR_INPUT / VAR_OUTPUT / VAR_MEM declaration automatically:
+//    1. Registers the variable with the web dashboard
 //    2. Assigns a Modbus holding-register address (auto-incremented)
 //
 //  Register layout (big-endian, Modbus standard):

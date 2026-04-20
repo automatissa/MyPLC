@@ -31,7 +31,7 @@
 // ── Heartbeat ─────────────────────────────────────────────────────────────────
 // L'ESP32 écrit 1 à cette adresse à chaque cycle.
 // La RPi efface à chaque scan → LED reste allumée tant que l'ESP32 répond.
-#define HEARTBEAT_ADDR  0   // = VAR_INPUT esp32_heartbeat addr 0 (40001)
+#define HEARTBEAT_ADDR  0   // = VAR_INPUT esp32_hb addr 0 (40001)
 
 // ── Mode ──────────────────────────────────────────────────────────────────────
 // USE_ESP32  1 : connexion WiFi + Modbus active — I/O physiques via GPIO
@@ -60,12 +60,13 @@ struct IoPin { uint8_t pin; uint16_t addr; };
 
 // Entrées terrain → VAR_INPUT de la RPi (ESP32 écrit, FC06)
 constexpr IoPin DIGITAL_INPUTS[] = {
-    // aucune entrée pour l'instant
+   // {13, 2},   // GPIO35 → sensor_ir  (40003) — capteur IR (HIGH = objet présent)
 };
 
 // Sorties terrain ← VAR_OUTPUT de la RPi (ESP32 lit, FC03)
 constexpr IoPin DIGITAL_OUTPUTS[] = {
-    // GPIO2 (LED intégrée) géré directement par le firmware — pas via Modbus
+    {26, 3},   // GPIO26 ← motor_run  (40004) — relais moteur convoyeur
+    {13, 4},   // GPIO13 ← led_start  (40005) — LED indicateur départ
 };
 
 // Entrées analogiques (ADC 12-bit 0–4095) → VAR_INPUT de la RPi
